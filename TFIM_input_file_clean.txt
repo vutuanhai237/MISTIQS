@@ -1,33 +1,36 @@
-*JZ
-0.01183898
+*JX
+1
 
+
+*JY
+1
 
 *h_ext
-0.01183898
+1
 
 *ext_dir
-X
+
 
 #any desired comments
 
 *initial_spins 
-1,1,1
+0,0
 
 
 *delta_t 
-3
+0.25
 
 
 *steps
-30
+40
 
 
 *shots 
-1024
+10000
 
 
 *num_qubits
-3
+2
 
 
 *device

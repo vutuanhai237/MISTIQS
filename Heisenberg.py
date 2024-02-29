@@ -33,7 +33,7 @@ class Heisenberg:
         self.ext_dir="Z"
         self.num_qubits=2
         self.initial_spins="1,1"
-        self.delta_t=1
+        self.delta_t=0.25
         self.steps=1
         self.QCQS="QS"
         self.shots=1024
@@ -70,7 +70,7 @@ class Heisenberg:
             elif "*initial_spins" in data[i]:
                 self.initial_spins=value
             elif "*delta_t" in data[i]:
-                self.delta_t=int(value)
+                self.delta_t=0.25
             elif "*steps" in data[i]:
                 self.steps=int(value)
             elif "*num_qubits" in data[i]:
@@ -113,7 +113,7 @@ class Heisenberg:
 
 
 
-        self.total_time=int(self.delta_t*self.steps)
+        self.total_time=10
 
 
 
@@ -134,17 +134,19 @@ class Heisenberg:
 
     def local_evolution_circuit(self,evol_time): #creates evolution circuit in local program
     #Initial flipped spins are not implemented in this function due to the need for "barrier". Need to do that outside of this.
-        prop_steps = int(evol_time / self.delta_t)  # number of propagation steps
+        print("abc: ", evol_time)
+        
+        prop_steps = int(evol_time / 0.25)  # number of propagation steps
         P=Program(self.num_qubits)
         for step in range(prop_steps):
-            t = (step + 0.5) * self.delta_t
+            t = (step + 0.5) * 0.25
             if "n" in self.time_dep_flag:
-                psi_ext = -2.0 * self.h_ext *self.delta_t / self.H_BAR
+                psi_ext = -2.0 * self.h_ext *0.25 / self.H_BAR
             elif "y" in self.time_dep_flag:
                 if "y" in self.custom_time_dep:
-                    psi_ext = -2.0 * self.h_ext * self.time_func(t)*self.delta_t / self.H_BAR
+                    psi_ext = -2.0 * self.h_ext * self.time_func(t)*0.25 / self.H_BAR
                 elif "n" in self.custom_time_dep:
-                    psi_ext=-2.0*self.h_ext*np.cos(2*np.pi*self.freq*t)*self.delta_t/self.H_BAR
+                    psi_ext=-2.0*self.h_ext*np.cos(2*np.pi*self.freq*t)*0.25/self.H_BAR
                 else:
                     print("Invalid selection for custom_time_dep parameter. Please enter y or n.")
                     with open(self.namevar,'a') as tempfile:
@@ -154,6 +156,10 @@ class Heisenberg:
             XX_instr_set=[]
             YY_instr_set=[]
             ZZ_instr_set=[]
+            
+            h1 = []
+            h1.append(Gate('H',[0]))
+            P.add_instr(h1)
             for q in range(self.num_qubits):
                 if self.ext_dir in "X":
                     ext_instr_set.append(Gate('RX', [q], angles=[psi_ext]))
@@ -161,9 +167,9 @@ class Heisenberg:
                     ext_instr_set.append(Gate('RY', [q], angles=[psi_ext]))
                 elif self.ext_dir in "Z":
                     ext_instr_set.append(Gate('RZ', [q], angles=[psi_ext]))
-            psiX=-2.0*(self.JX)*self.delta_t/self.H_BAR
-            psiY=-2.0*(self.JY)*self.delta_t/self.H_BAR
-            psiZ=-2.0*(self.JZ)*self.delta_t/self.H_BAR
+            psiX=-2.0*(self.JX)*0.25/self.H_BAR
+            psiY=-2.0*(self.JY)*0.25/self.H_BAR
+            psiZ=-2.0*(self.JZ)*0.25/self.H_BAR
 
             for q in range(self.num_qubits-1):
                 XX_instr_set.append(Gate('H',[q]))
@@ -204,7 +210,7 @@ class Heisenberg:
             print("Generating timestep {} circuit".format(j))
             with open(self.namevar,'a') as tempfile:
                 tempfile.write("Generating timestep {} circuit\n".format(j))
-            evolution_time = self.delta_t * j
+            evolution_time = 0.25 * j
             circuits.append(self.local_evolution_circuit(evolution_time))
 
         self.circuits_list=circuits
@@ -219,18 +225,19 @@ class Heisenberg:
         from qiskit.visualization import plot_histogram, plot_gate_map, plot_circuit_layout
         from qiskit import Aer, IBMQ, execute
         from qiskit.providers.aer import noise
-        from qiskit.providers.aer.noise import NoiseModel
+        from qiskit_aer.noise import NoiseModel
         from qiskit.circuit import quantumcircuit
         from qiskit.circuit import Instruction
         self.qr=qk.QuantumRegister(self.num_qubits, 'q')
         self.cr=qk.ClassicalRegister(self.num_qubits, 'c')
         if "y" in self.compile:
             ## Show available backends
-            provider = qk.IBMQ.get_provider(group='open')
-            provider.backends()
-
+            # provider = qk.IBMQ.get_provider(group='open')
+            # provider.backends()
+            from qiskit.providers.fake_provider import FakeQasmSimulator
+            device = FakeQasmSimulator()
             #choose the device you would like to run on
-            device = provider.get_backend(self.device_choice)
+            # device = provider.get_backend(self.device_choice)
 
             #gather fidelity statistics on this device if you want to create a noise model for the simulator
             properties = device.properties()
@@ -238,16 +245,17 @@ class Heisenberg:
 
             #TO RUN ON THE SIMULATOR 
             #create a noise model to use for the qubits of the simulator
-            noise_model = NoiseModel.from_backend(device)
+            simulator = Aer.get_backend('qasm_simulator')
+            noise_model = NoiseModel.from_backend(simulator)
             # Get the basis gates for the noise model
             basis_gates = noise_model.basis_gates
 
             # Select the QasmSimulator from the Aer provider
-            simulator = Aer.get_backend('qasm_simulator')
+            
 
 
             #To run on the quantum computer, assign a quantum computer of your choice as the backend 
-            backend = provider.get_backend(self.device_choice)
+            # backend = provider.get_backend(self.device_choice)
 
 
         print("Creating IBM quantum circuit objects...")
@@ -438,7 +446,7 @@ class Heisenberg:
 
     def parameters(self):
         print("Current model parameters:\n\nH_BAR = {}\nJX = {}\nJY = {}\nJZ = {}\nh_ext = {}\next_dir = {}".format(self.H_BAR,self.JX,self.JY,self.JZ,self.h_ext,self.ext_dir))
-        print("num_qubits = {}\ninitial_spins = {}\ndelta_t = {}\nsteps = {}\nQCQS = {}\nshots = {}\nnoise_choice = {}".format(self.num_qubits,self.initial_spins,self.delta_t,self.steps,self.QCQS,self.shots,self.noise_choice))
+        print("num_qubits = {}\ninitial_spins = {}\ndelta_t = {}\nsteps = {}\nQCQS = {}\nshots = {}\nnoise_choice = {}".format(self.num_qubits,self.initial_spins,0.25,self.steps,self.QCQS,self.shots,self.noise_choice))
         print("device choice = {}\nplot_flag = {}\nfreq = {}\ntime_dep_flag = {}\ncustom_time_dep = {}\n".format(self.device_choice,self.plot_flag,self.freq,self.time_dep_flag,self.custom_time_dep)) 
         print("compile = {}\nauto_smart_compile = {}\ndefault_compiler = {}".format(self.compile,self.auto_smart_compile,self.default_compiler))
         #this is missing some of the latest parameter additions
@@ -471,8 +479,11 @@ class Heisenberg:
       mag = 0
       for spin_str, count in result.items():
         spin_int = [1 - 2 * float(spin_str[qub])]
-        #print(spin_str)
-        mag += (sum(spin_int) / len(spin_int)) * count
+        # spin_int = [2 * float(spin_str[qub])]
+        # print("Spin cu: ", [1 - 2 * float(spin_str[qub])])
+
+        print("Spin cu: ", spin_str[qub])
+        mag += (sum(spin_int) / (len(spin_int))) * count
       average_mag = mag / shots
       return average_mag
 
@@ -498,16 +509,16 @@ class Heisenberg:
             from qiskit.tools.monitor import job_monitor
             from qiskit.visualization import plot_histogram, plot_gate_map, plot_circuit_layout
             from qiskit import Aer, IBMQ, execute
-            from qiskit.providers.aer import noise
-            from qiskit.providers.aer.noise import NoiseModel
+            from qiskit_aer.noise import NoiseModel
             from qiskit.circuit import quantumcircuit
             from qiskit.circuit import Instruction
             ## Show available backends
-            provider = qk.IBMQ.get_provider(group='open')
-            provider.backends()
-
+            # provider = qk.IBMQ.get_provider(group='open')
+            # provider.backends()
+            from qiskit.providers.fake_provider import FakeQasmSimulator
+            device = FakeQasmSimulator()
             #choose the device you would like to run on
-            device = provider.get_backend(self.device_choice)
+            # device = provider.get_backend(self.device_choice)
 
             #gather fidelity statistics on this device if you want to create a noise model for the simulator
             properties = device.properties()
@@ -515,16 +526,17 @@ class Heisenberg:
 
             #TO RUN ON THE SIMULATOR 
             #create a noise model to use for the qubits of the simulator
-            noise_model = NoiseModel.from_backend(device)
+            simulator = Aer.get_backend('qasm_simulator')
+            noise_model = NoiseModel.from_backend(simulator)
             # Get the basis gates for the noise model
             basis_gates = noise_model.basis_gates
 
             # Select the QasmSimulator from the Aer provider
-            simulator = Aer.get_backend('qasm_simulator')
+            
 
 
             #To run on the quantum computer, assign a quantum computer of your choice as the backend 
-            backend = provider.get_backend(self.device_choice)
+            backend = simulator
 
             #CHOOSE TO RUN ON QUANTUM COMPUTER OR SIMULATOR
             if self.QCQS in ["QC"]:
@@ -547,6 +559,7 @@ class Heisenberg:
                     with open(self.namevar,'a') as tempfile:
                         tempfile.write("Running noiseless simulator job...\n")
                     result_noise=execute(self.ibm_circuits_list,simulator,coupling_map=coupling_map,basis_gates=basis_gates,shots=self.shots).result()
+                    
                     print("Noiseless simulator job successful")
                     with open(self.namevar,'a') as tempfile:
                         tempfile.write("Noiseless simulator job successful\n")
@@ -576,8 +589,28 @@ class Heisenberg:
                     with open(self.namevar,'a') as tempfile:
                         tempfile.write("Post-processing qubit {} data\n".format(j+1))
                     for c in self.ibm_circuits_list:
-                        result_dict = result_noise.get_counts(c)
-                        temp.append(self.average_magnetization(result_dict, self.shots,j))
+                        #####
+                        from qiskit.quantum_info import Statevector
+                        from scipy.linalg import expm
+                        from qiskit.quantum_info import Pauli
+                        import numpy as np
+                        c.remove_final_measurements()
+                        # Define Pauli matrices
+                        XX = Pauli ('XX').to_matrix ()
+                        YY = Pauli ('YY').to_matrix ()
+                        ZZ = Pauli ('ZZ').to_matrix ()
+                        ZI = Pauli ('ZI').to_matrix ()
+                        IZ = Pauli ('IZ').to_matrix ()
+                        statevector = Statevector.from_instruction(c)
+                        psi_t = np.array(statevector.data).reshape(-1, 1)
+                        psi_t_dag = np.conj(psi_t.T)
+
+                        mag = (psi_t_dag @ ZI @ psi_t)[0][0] - (psi_t_dag @ IZ @ psi_t)[0][0]
+                        
+                        ########
+                        # result_dict = result_noise.get_counts(c)
+                        temp.append(mag)
+                        # temp.append(self.average_magnetization(result_dict, self.shots,j))
                         if i % (self.steps+1) == 0:
                             avg_mag_sim.append(temp)
                             temp = []
@@ -620,12 +653,33 @@ class Heisenberg:
                     with open(self.namevar,'a') as tempfile:
                         tempfile.write("Post-processing qubit {} data\n".format(j+1))
                     for c in self.ibm_circuits_list:
-                            result_dict = results.get_counts(c)
-                            temp.append(self.average_magnetization(result_dict, self.shots,j))
-                            if i % (self.steps+1) == 0:
-                                    avg_mag_qc.append(temp)
-                                    temp = []
-                            i += 1
+                        #####
+                        from qiskit.quantum_info import Statevector
+                        from scipy.linalg import expm
+                        from qiskit.quantum_info import Pauli
+                        import numpy as np
+                        c.remove_final_measurements()
+                        # Define Pauli matrices
+                        XX = Pauli ('XX').to_matrix ()
+                        YY = Pauli ('YY').to_matrix ()
+                        ZZ = Pauli ('ZZ').to_matrix ()
+                        ZI = Pauli ('ZI').to_matrix ()
+                        IZ = Pauli ('IZ').to_matrix ()
+                        statevector = Statevector.from_instruction(c)
+                        psi_t = np.array(statevector.data).reshape(-1, 1)
+                        psi_t_dag = np.conj(psi_t.T)
+
+                        mag = (psi_t_dag @ ZI @ psi_t)[0][0] - (psi_t_dag @ IZ @ psi_t)[0][0]
+                        
+                        ########
+                        result_dict = result_noise.get_counts(c)
+                        temp.append(mag)
+                        # result_dict = results.get_counts(c)
+                        # temp.append(self.average_magnetization(result_dict, self.shots,j))
+                        if i % (self.steps+1) == 0:
+                            avg_mag_qc.append(temp)
+                            temp = []
+                        i += 1
                     
                     # QC
                     if "y" in self.plot_flag:
